@@ -98,9 +98,12 @@ function App() {
     {query && <Reporter query={query} />}
     {isTop && <div>
       <p>
-        BundlePhobia with tree-shake
+        <a href="https://bundlephobia.com/">BundlePhobia</a> with tree-shake
       </p>
-
+      <h2>How it works</h2>
+      <p>
+        Download sources from <a href="https://cdn.skypack.dev">cdn.skpack.dev</a> and build with rollup and terser in your browser.
+      </p>
       <h2>How to Use</h2>
       <p>
         <ul>
@@ -114,9 +117,10 @@ function App() {
               {location.protocol}//{location.host}/?pkg=react-dom&imports=render
             </a>
           </li>
-
         </ul>
       </p>
+      <hr />
+      <a href="https://github.com/mizchi/shaker-phobia">GitHub</a>
     </div>}
   </div>
 }
