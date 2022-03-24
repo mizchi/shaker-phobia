@@ -40,7 +40,7 @@ function Reporter(props: { query: Query }) {
     return <div>CompileError: {result.reason}</div>
   }
 
-  const pkgName = props.query.pkg?.match(/^@?([^/@]+)(@\w*)?/)?.[1];
+  const pkgName = props.query.pkg?.match(/^(@?[^@]+)(@\w*)?/)?.[1];
   const code = props.query.imports ? `{ ` + props.query.imports.split(',').join(", ") + ` }` : `* as x`
   return <div>
     <pre>
@@ -131,12 +131,16 @@ function App() {
                 imports: undefined
               },
               {
+                pkg: '@mizchi/mints',
+                imports: ['transformSync']
+              },
+              {
                 pkg: 'lodash',
-                imports: ['isEqual']
+                imports: ['isEqual', 'get', 'flatten']
               },
               {
                 pkg: 'lodash-es',
-                imports: ['isEqual']
+                imports: ['chain']
               }
             ].map(t => {
               const url = `${location.protocol}//${location.host}/?pkg=${t.pkg}${t.imports ? `&imports=${t.imports.join(',')}` : ''}`;
