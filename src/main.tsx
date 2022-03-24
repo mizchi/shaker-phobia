@@ -114,7 +114,7 @@ function App() {
           </li>
           <li>
             <a href={`${location.protocol}//${location.host}/?pkg=react-dom@16.0.0&imports=render`}>
-              {location.protocol}//{location.host}/?pkg=react-dom&imports=render
+              {location.protocol}//{location.host}/?pkg=react-dom@16.0.0&imports=render
             </a>
           </li>
         </ul>
