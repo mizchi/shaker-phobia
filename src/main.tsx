@@ -1,4 +1,4 @@
-import type {Api, CompileResult} from "./worker";
+import type { Api, CompileResult } from "./worker";
 import { render } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import { wrap } from "comlink";
@@ -11,8 +11,8 @@ type Query = {
   imports?: string
 }
 
-function Reporter(props: {query: Query}) {
-  const [error, setError] = useState<{reason: string} | null>(null);
+function Reporter(props: { query: Query }) {
+  const [error, setError] = useState<{ reason: string } | null>(null);
   const [result, setResult] = useState<CompileResult | null>(null);
 
   useEffect(() => {
@@ -22,10 +22,10 @@ function Reporter(props: {query: Query}) {
         const ret = await api.compile(
           `https://cdn.skypack.dev/${props.query.pkg}`,
           imports
-        );  
-        setResult(ret);  
+        );
+        setResult(ret);
       } catch (err) {
-        setError({reason: 'compile error'});
+        setError({ reason: 'compile error' });
       }
     })();
   }, [props.query]);
@@ -34,33 +34,30 @@ function Reporter(props: {query: Query}) {
     return <div>CompileError: {error.reason}</div>
   }
   if (!result) {
-    return <div>...</div>
+    return <div>compiling...</div>
   }
+  if (result.error) {
+    return <div>CompileError: {result.reason}</div>
+  }
+
+  const pkgName = props.query.pkg?.match(/^@?([^/@]+)(@\w*)?/)?.[1];
+  const code = props.query.imports ? `{ ` + props.query.imports.split(',').join(", ") + ` }` : `* as x`
   return <div>
-    <h2>Input</h2>
-    <div>Pkg: {props.query.pkg ?? '...'}</div>
-    <div>imports: <strong>{props.query.imports?.length ? props.query.imports : '*'}</strong></div>
-    <h2>Result</h2>
-    <p>
-      <div>
-        size: {bytesToSize(result.size)}
-      </div>
-      <div>
-        gzip: {bytesToSize(result.gzipSize)}
-      </div>
-    </p>
-    <hr />
-    <h3>Input</h3>
     <pre>
-      <code>
-        {result.input}
+      <code style={{fontSize: '1rem', fontFamily: 'menlo'}}>
+        import {code} from "{pkgName}";{'\n'}
       </code>
     </pre>
-    <hr />
-    <h3>Output Detail</h3>
+    <p style={{paddingTop: '2rem', paddingBottom: '4rem'}}>
+      <strong style={{fontSize: '3rem'}}>
+        {bytesToSize(result.size)}
+        &nbsp;
+        | gzip: {bytesToSize(result.gzipSize)}
+      </strong>
+    </p>
     <details>
-      <summary>code</summary>
-      <pre style={{width: '80vw', fontFamily: 'monaco', whiteSpace: 'pre-wrap', wordBreak: 'break-all'}}>
+      <summary>Output</summary>
+      <pre style={{ width: '100%', fontFamily: 'monaco', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
         <code>
           {result.code}
         </code>
@@ -70,7 +67,7 @@ function Reporter(props: {query: Query}) {
 }
 
 function App() {
-  const [error, setError] = useState<{reason: string} | null>(null);
+  const [error, setError] = useState<{ reason: string } | null>(null);
   const [isTop, setIsTop] = useState(false);
   const [query, setQuery] = useState<Query | null>(null);
   useEffect(() => {
@@ -80,47 +77,78 @@ function App() {
     }
     const query: Query = location.search.slice(1).split("&").reduce((acc, cur) => {
       const [key, val] = cur.split("=");
-      return {...acc, [key]: val};
+      return { ...acc, [key]: val };
     }, {});
     if (query.pkg) {
       if (query.pkg && /[a-zA-Z@][a-zA-Z-_\d\/\@]+/.test(query.pkg)) {
         setQuery(query);
       } else {
-        setError({reason: 'Invalid pkgName'});
-      }  
+        setError({ reason: 'Invalid pkgName' });
+      }
     } else {
       setIsTop(true);
     }
   }, []);
-
   return <div>
-    <h1>ShakerPhobia</h1>
-    {query && <Reporter query={query} />}
+    <header>
+      <h1>
+        <a href="/" style={{}}>
+          ShakerPhobia
+        </a>
+      </h1>
+      <p>
+        bundle size after treeshake
+        &nbsp;|&nbsp;
+        <a href="https://github.com/mizchi/shaker-phobia">GitHub</a>
+        &nbsp;|&nbsp;
+        author: <a href="https://twitter.com/mizchi">@mizchi</a>
+      </p>
+      {query && <Reporter query={query} />}
+    </header>
+    {error && <div>
+      {error.reason}
+    </div>}
     {isTop && <div>
+      <h2>What's this</h2>
       <p>
-        <a href="https://bundlephobia.com/">BundlePhobia</a> with tree-shake
+        This is a tool to check bundle size with treeshake.
+        It downloads sources from <a href="https://cdn.skypack.dev">cdn.skpack.dev</a> and build with rollup and terser <strong>in your browser</strong>.
       </p>
-      <h2>How it works</h2>
       <p>
-        Download sources from <a href="https://cdn.skypack.dev">cdn.skpack.dev</a> and build with rollup and terser in your browser.
+        Open to bundle: <code style={{fontSize: '1rem'}}>{`https://shakerphobia.netlify.com/?pkg=<name(@version)>&imports=<a,b,c>`}</code>.
       </p>
-      <h2>How to Use</h2>
+      <h2>Examples</h2>
       <p>
         <ul>
-          <li>
-            <a href={`${location.protocol}//${location.host}/?pkg=preact&imports=h,render`}>
-              {location.protocol}//{location.host}/?pkg=preact&imports=h,render
-            </a>
-          </li>
-          <li>
-            <a href={`${location.protocol}//${location.host}/?pkg=react-dom@16.0.0&imports=render`}>
-              {location.protocol}//{location.host}/?pkg=react-dom@16.0.0&imports=render
-            </a>
-          </li>
+          {
+            [
+              {
+                pkg: 'preact',
+                imports: ['render', 'h']
+              },
+              {
+                pkg: 'react@16.0.0',
+                imports: undefined
+              },
+              {
+                pkg: 'lodash',
+                imports: ['isEqual']
+              },
+              {
+                pkg: 'lodash-es',
+                imports: ['isEqual']
+              }
+            ].map(t => {
+              const url = `${location.protocol}//${location.host}/?pkg=${t.pkg}${t.imports ? `&imports=${t.imports.join(',')}` : ''}`;
+              return <li>
+                <a href={url}>
+                  {url}
+                </a>
+              </li>
+            })
+          }
         </ul>
       </p>
-      <hr />
-      <a href="https://github.com/mizchi/shaker-phobia">GitHub</a>
     </div>}
   </div>
 }

@@ -3,13 +3,16 @@ import { rollup } from "rollup";
 import { expose } from "comlink";
 import { Plugin } from "rollup";
 import path from "path";
-// import virtual from "@rollup/plugin-virtual";
 
 export type CompileResult = {
+  error: false,
   input: string;
   code: string,
   size: number,
   gzipSize: number,
+} | {
+  error: true,
+  reason: string
 };
 
 declare const CompressionStream: any;
@@ -22,7 +25,6 @@ async function compress(str: string): Promise<ArrayBuffer> {
   return new Response(stream as any).arrayBuffer();
 }
 
-
 const api = {
   async compile(pkgName: string, imports: string[] | undefined): Promise<CompileResult> {
     const importsString = imports?.join(",");
@@ -30,39 +32,45 @@ const api = {
       ? `import {${importsString}} from "${pkgName}";\nconsole.log(${importsString})`
       : `import * as x from "${pkgName}";console.log(x)`;
 
-    const bundle = await rollup({
-      input: 'entry.js',
-      plugins: [
-        {
-          name: 'entry',
-          resolveId(id, importer) {
-            if (importer == null) {
-              return 'entry.js';
+    try {
+      const bundle = await rollup({
+        input: 'entry.js',
+        plugins: [
+          {
+            name: 'entry',
+            resolveId(id, importer) {
+              if (importer == null) {
+                return 'entry.js';
+              }
+            },
+            load(id) {
+              if (id === 'entry.js') {
+                return input;
+              }
             }
           },
-          load(id) {
-            if (id === 'entry.js') {
-              return input;
-            }
-          }
-        },
-        httpResolve({
-          // resolveIdFallback: (id, importer) => {}
-        })
-      ]
-    }); 
-    const generated = await bundle.generate({
-      format: 'es',
-    });
-    const main = generated.output[0].code;
-    const minified = await minify(main, { module: true });
-    const gzipped = await compress(minified.code!);
-    return {
-      input,
-      code: minified.code!,
-      size: minified.code!.length - importsString!.length,
-      gzipSize: gzipped.byteLength,
-    };
+          httpResolve()
+        ]
+      }); 
+      const generated = await bundle.generate({
+        format: 'es',
+      });
+      const main = generated.output[0].code;
+      const minified = await minify(main, { module: true });
+      const gzipped = await compress(minified.code!);
+      return {
+        error: false,
+        input,
+        code: minified.code!,
+        size: minified.code!.length,
+        gzipSize: gzipped.byteLength,
+      };  
+    } catch (e) {
+      return {
+        error: true,
+        reason: e instanceof Error ? e.message : JSON.stringify(e),
+      }
+    }
   }
 };
 
@@ -70,7 +78,7 @@ export type Api = typeof api;
 
 expose(api);
 
-
+// http-resolve
 function isHttpProtocol(id: string | undefined | null) {
   return id?.startsWith("https://");
 }
@@ -102,15 +110,12 @@ const httpResolve = function httpResolve_({
       // on network resolve
       if (importer && isHttpProtocol(importer)) {
         log("[http-resolve:resolveId:target]", id, "from", importer);
-
         if (id.startsWith("https://")) {
           log("[http-reslove:end] return with https", id);
           return id;
         }
         const { pathname, protocol, host } = new URL(importer);
-        // for skypack
         if (id.startsWith("/")) {
-          // pattern: /_/ in https://cdn.skypack.dev
           log(
             "[http-reslove:end] return with host root",
             `${protocol}//${host}${id}`
