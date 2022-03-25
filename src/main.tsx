@@ -27,6 +27,9 @@ function Reporter(props: { query: Query }) {
           `https://cdn.skypack.dev/${props.query.pkg}`,
           imports,
         );
+        if (!ret.error && ret.code.includes("[Package Error]")) {
+          setError({ reason: ret.code });
+        }
         setResult(ret);
       } catch (err) {
         setError({ reason: "compile error" });
@@ -35,55 +38,48 @@ function Reporter(props: { query: Query }) {
   }, [props.query]);
 
   if (error) {
-    return <div>CompileError: {error.reason}</div>;
+    return <div>
+      BundleError
+      <pre style={{wordBreak: 'break-all', whiteSpace: 'pre-wrap'}}>
+        <code>
+          {error.reason}
+        </code>
+      </pre>
+    </div>;
   }
   if (!result) {
-    return <div>compiling...</div>;
+    return <div>bundling...</div>;
   }
   if (result.error) {
     return <div>CompileError: {result.reason}</div>;
   }
-
-  const pkgName = props.query.pkg?.match(/^(@?[^@]+)(@\w*)?/)?.[1].replace(
-    /-/g,
-    "_",
-  );
-  const code = props.query.imports
-    ? `{ ` + props.query.imports.split(",").join(", ") + ` }`
-    : `defaults`;
   return (
-    <div>
-      <pre>
-        <code style={{ fontSize: "1rem", fontFamily: "menlo" }}>
-          import {code} from "{pkgName}";{"\n"}
-        </code>
-      </pre>
-      <p style={{ paddingTop: "2rem", paddingBottom: "4rem" }}>
-        <strong style={{ fontSize: "3rem" }}>
-          {bytesToSize(result.size)}
-          &nbsp; | gzip: {bytesToSize(result.gzipSize)}
-        </strong>
+    <div style={{width: '100%'}}>
+      <p style={{ display: 'grid', placeItems: 'start', fontSize: '3rem' }}>
+          {bytesToSize(result.size)} - gzip: {bytesToSize(result.gzipSize)}
       </p>
-      <details>
-        <summary>Output</summary>
-        <pre
-          style={{
-            width: "100%",
-            fontFamily: "monaco",
-            whiteSpace: "pre-wrap",
-            wordBreak: "break-all",
-          }}
-        >
-          <code>
-            {result.code}
-          </code>
-        </pre>
-      </details>
+      <div style={{maxWidth: '100%', overflow: 'none'}}>
+        <details>
+          <summary>Output</summary>
+          <pre
+            style={{
+              width: "100%",
+              fontFamily: "monaco",
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-all",
+            }}
+          >
+            <code>
+              {result.code}
+            </code>
+          </pre>
+        </details>
+      </div>
     </div>
   );
 }
 
-function SearchForm() {
+function SearchForm(props: { pkg: string, imports: string, onChangePkg: (pkg: string) => void, onChangeImports: (imports: string) => void }) {
   return (
     <div>
       <form
@@ -106,7 +102,9 @@ function SearchForm() {
             type="text"
             id="imports"
             name="imports"
-            placeholder="render,h"
+            value={props.imports}
+            onChange={(e: any) => props.onChangeImports(e.target.value)}
+            placeholder="a,b,c..."
           />
         </div>
         <div style={{ display: "grid", placeItems: "center", height: "100%" }}>
@@ -121,7 +119,13 @@ function SearchForm() {
             paddingLeft: "0.4rem",
           }}
         >
-          <input type="text" id="pkg" name="pkg" placeholder="preact@10.6.6" />
+          <input
+            type="text"
+            id="pkg"
+            name="pkg"
+            value={props.pkg} placeholder="pkg@version"
+            onChange={(e: any) => props.onChangePkg(e.target.value)}
+          />
         </div>
         <div style={{ display: "inline-flex" }}>
           <input type="submit" value="Bundle"></input>
@@ -155,20 +159,12 @@ function TopPage() {
               imports: ["render", "h"],
             },
             {
-              pkg: "react@16.0.0",
-              imports: undefined,
+              pkg: "react-dom@18.0.0",
+              imports: ["hydrate"],
             },
             {
               pkg: "@mizchi/mints",
               imports: ["transformSync"],
-            },
-            {
-              pkg: "lodash",
-              imports: ["isEqual", "get", "flatten"],
-            },
-            {
-              pkg: "lodash-es",
-              imports: ["chain"],
             },
           ].map((t) => {
             const url = `${location.protocol}//${location.host}/?pkg=${t.pkg}${
@@ -200,19 +196,21 @@ function App() {
     const query: Query = location.search.slice(1).split("&").reduce(
       (acc, cur) => {
         const [key, val] = cur.split("=");
-        return { ...acc, [key]: val };
+        return { ...acc, [decodeURIComponent(key)]: decodeURIComponent(val) };
       },
       {},
     );
+    // console.log(query);
+
     if (query.pkg) {
       if (query.pkg && /[a-zA-Z@][a-zA-Z-_\d\/\@]+/.test(query.pkg)) {
         setQuery(query);
         const pkg = document.querySelector("[name=pkg]") as HTMLInputElement;
         if (pkg) {
-          pkg.value = decodeURIComponent(query.pkg);
+          pkg.value = query.pkg;
         }
         const imports = document.querySelector("[name=imports]") as HTMLInputElement;
-        if (pkg) {
+        if (imports) {
           imports.value = query.imports ?? '';
         }
       } else {
@@ -235,11 +233,19 @@ function App() {
           <a href="https://github.com/mizchi/shaker-phobia">GitHub</a>
           &nbsp;|&nbsp; author: <a href="https://twitter.com/mizchi">@mizchi</a>
         </p>
-        <SearchForm />
-        <div style={{paddingTop: '2rem'}}>
+        <SearchForm
+          pkg={query?.pkg ?? 'preact@10.6.6'}
+          imports={query?.imports ?? 'render,h'}
+          onChangePkg={(pkg) => setQuery({ ...query, pkg })}
+          onChangeImports={(imports) => setQuery({ ...query, imports })}
+        />
+        <hr />
+      </header>
+      <main>
+        <div style={{paddingTop: '1rem'}}>
           {query && <Reporter query={query} />}
         </div>
-      </header>
+      </main>
       {error && (
         <div>
           {error.reason}
@@ -257,7 +263,7 @@ function bytesToSize(bytes: number, decimals = 2) {
 
   const k = 1024;
   const dm = decimals < 0 ? 0 : decimals;
-  const sizes = ["Bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
+  const sizes = ["bytes", "kb", "MB", "GB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + " " + sizes[i];
 }
