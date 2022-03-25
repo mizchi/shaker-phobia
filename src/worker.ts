@@ -5,14 +5,14 @@ import { Plugin } from "rollup";
 import path from "path";
 
 export type CompileResult = {
-  error: false,
+  error: false;
   input: string;
-  code: string,
-  size: number,
-  gzipSize: number,
+  code: string;
+  size: number;
+  gzipSize: number;
 } | {
-  error: true,
-  reason: string
+  error: true;
+  reason: string;
 };
 
 declare const CompressionStream: any;
@@ -26,34 +26,37 @@ async function compress(str: string): Promise<ArrayBuffer> {
 }
 
 const api = {
-  async compile(pkgName: string, imports: string[] | undefined): Promise<CompileResult> {
+  async compile(
+    pkgName: string,
+    imports: string[] | undefined,
+  ): Promise<CompileResult> {
     const importsString = imports?.join(",");
     const input = imports?.length
       ? `import {${importsString}} from "${pkgName}";\nconsole.log(${importsString})`
-      : `import * as x from "${pkgName}";console.log(x)`;
+      : `import x from "${pkgName}";console.log(x)`;
 
     try {
       const bundle = await rollup({
-        input: 'entry.js',
+        input: "entry.js",
         plugins: [
           {
-            name: 'entry',
+            name: "entry",
             resolveId(id, importer) {
               if (importer == null) {
-                return 'entry.js';
+                return "entry.js";
               }
             },
             load(id) {
-              if (id === 'entry.js') {
+              if (id === "entry.js") {
                 return input;
               }
-            }
+            },
           },
-          httpResolve()
-        ]
-      }); 
+          httpResolve(),
+        ],
+      });
       const generated = await bundle.generate({
-        format: 'es',
+        format: "es",
       });
       const main = generated.output[0].code;
       const minified = await minify(main, { module: true });
@@ -64,14 +67,14 @@ const api = {
         code: minified.code!,
         size: minified.code!.length,
         gzipSize: gzipped.byteLength,
-      };  
+      };
     } catch (e) {
       return {
         error: true,
         reason: e instanceof Error ? e.message : JSON.stringify(e),
-      }
+      };
     }
-  }
+  },
 };
 
 export type Api = typeof api;
@@ -118,10 +121,10 @@ const httpResolve = function httpResolve_({
         if (id.startsWith("/")) {
           log(
             "[http-reslove:end] return with host root",
-            `${protocol}//${host}${id}`
+            `${protocol}//${host}${id}`,
           );
           return `${protocol}//${host}${id}`;
-        } else if (id.startsWith(".") || id === 'entry.js') {
+        } else if (id.startsWith(".") || id === "entry.js") {
           // pattern: ./xxx/yyy in https://esm.sh
           const resolvedPathname = path.join(path.dirname(pathname), id);
           const newId = `${protocol}//${host}${resolvedPathname}`;
