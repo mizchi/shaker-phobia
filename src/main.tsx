@@ -237,7 +237,7 @@ function App() {
           pkg={query?.pkg ?? 'preact@10.6.6'}
           imports={query?.imports ?? 'render,h'}
           onChangePkg={(pkg) => setQuery({ ...query, pkg })}
-          onChangeImports={(imports) => setQuery({ ...query, imports })}
+          onChangeImports={(imports) => setQuery({ ...query, imports: imports.replace(/ /g, "") })}
         />
         <hr />
       </header>
